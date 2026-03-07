@@ -57,6 +57,11 @@ const ALLOWED_CLIENT_PROVIDERS: ProviderName[] = [
     "ollama",
     "doubao",
     "modelscope",
+    "glm",
+    "qwen",
+    "qiniu",
+    "kimi",
+    "minimax",
 ]
 
 // Bedrock provider options for Anthropic beta features
@@ -474,7 +479,12 @@ function buildProviderOptions(
         case "sglang":
         case "gateway":
         case "modelscope":
-        case "doubao": {
+        case "doubao":
+        case "minimax":
+        case "glm":
+        case "qwen":
+        case "kimi":
+        case "qiniu": {
             // These providers don't have reasoning configs in AI SDK yet
             // Gateway passes through to underlying providers which handle their own configs
             break
@@ -504,6 +514,11 @@ const PROVIDER_ENV_VARS: Record<ProviderName, string | null> = {
     edgeone: null, // No credentials needed - uses EdgeOne Edge AI
     doubao: "DOUBAO_API_KEY",
     modelscope: "MODELSCOPE_API_KEY",
+    glm: "GLM_API_KEY",
+    qwen: "QWEN_API_KEY",
+    qiniu: "QINIU_API_KEY",
+    kimi: "KIMI_API_KEY",
+    minimax: "MINIMAX_API_KEY",
 }
 
 /**
@@ -1172,9 +1187,38 @@ export function getAIModel(overrides?: ClientOverrides): ModelConfig {
             break
         }
 
+        case "minimax":
+        case "glm":
+        case "qwen":
+        case "qiniu":
+        case "kimi": {
+            const envVar = PROVIDER_ENV_VARS[provider]
+            if (!envVar) {
+                throw new Error(
+                    `API key environment variable not defined for provider: ${provider}`,
+                )
+            }
+            const apiKey = resolveApiKey(overrides, envVar)
+            const baseURL = resolveBaseURL(
+                overrides?.apiKey,
+                overrides?.baseUrl,
+                resolveBaseUrlEnv(
+                    overrides,
+                    `${provider.toUpperCase()}_BASE_URL`,
+                ),
+                undefined, // Use default from PROVIDER_INFO
+            )
+            const customProvider = createOpenAI({
+                apiKey,
+                baseURL,
+            })
+            model = customProvider.chat(modelId)
+            break
+        }
+
         default:
             throw new Error(
-                `Unknown AI provider: ${provider}. Supported providers: bedrock, openai, anthropic, google, azure, ollama, openrouter, deepseek, siliconflow, sglang, gateway, edgeone, doubao, modelscope`,
+                `Unknown AI provider: ${provider}. Supported providers: bedrock, openai, anthropic, google, azure, ollama, openrouter, deepseek, siliconflow, sglang, gateway, edgeone, doubao, modelscope, glm, qwen, qiniu, kimi, minimax`,
             )
     }
 
